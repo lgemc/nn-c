@@ -102,9 +102,62 @@ void test_mdarray_dot_product(void) {
     mdarray_free(result);
 }
 
-int main(void) {
-    UNITY_BEGIN();
-    RUN_TEST(test_mdarray_creation_and_access);
-    RUN_TEST(test_mdarray_dot_product);
-    return UNITY_END();
+void test_md_array_sum_one_dimension(void) {
+    size_t shape[] = {1,1};
+    size_t pos0[] = {0,0};
+
+    MDArray* arr1 = mdarray_create(2, shape, sizeof(double));
+    MDArray* arr2 = mdarray_create(2, shape, sizeof(double));
+
+    double val0 = 10;
+    double val1 = 5;
+
+    mdarray_set_element(arr1, pos0, &val0);
+    mdarray_set_element(arr2, pos0, &val1);
+
+    MDArray* result = mdarray_sum(arr1, arr2);
+
+    double* result_0_0 = mdarray_get_element(result, pos0);
+
+    double* arr1_pos_0 = mdarray_get_element(arr1, pos0);
+    TEST_ASSERT_EQUAL(10, *arr1_pos_0);
+    TEST_ASSERT_EQUAL(15, *result_0_0);
+}
+
+void test_md_array_sum_three_dimensions(void) {
+    size_t shape[] = {2,2,2};
+    size_t pos0[] = {0,0,0};
+    size_t pos1[] = {0,0,1};
+    size_t pos2[] = {0,1,0};
+    size_t pos3[] = {0,1,1};
+
+    MDArray* arr1 = mdarray_create(3, shape, sizeof(double));
+    MDArray* arr2 = mdarray_create(3, shape, sizeof(double));
+
+    double val0 = 10;
+    double val1 = 5;
+
+    mdarray_set_element(arr1, pos0, &val0);
+    mdarray_set_element(arr1, pos1, &val0);
+    mdarray_set_element(arr1, pos2, &val0);
+    mdarray_set_element(arr1, pos3, &val0);
+
+    mdarray_set_element(arr2, pos0, &val1);
+    mdarray_set_element(arr2, pos1, &val1);
+    mdarray_set_element(arr2, pos2, &val1);
+    mdarray_set_element(arr2, pos3, &val1);
+
+    MDArray* result = mdarray_sum(arr1, arr2);
+
+    double* result_0_0_0 = mdarray_get_element(result, pos0);
+    double* result_0_0_1 = mdarray_get_element(result, pos1);
+    double* result_0_1_0 = mdarray_get_element(result, pos2);
+    double* result_0_1_1 = mdarray_get_element(result, pos3);
+
+    double* arr1_pos_0 = mdarray_get_element(arr1, pos0);
+    TEST_ASSERT_EQUAL(10, *arr1_pos_0);
+    TEST_ASSERT_EQUAL(15, *result_0_0_0);
+    TEST_ASSERT_EQUAL(15, *result_0_0_1);
+    TEST_ASSERT_EQUAL(15, *result_0_1_0);
+    TEST_ASSERT_EQUAL(15, *result_0_1_1);
 }

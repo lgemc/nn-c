@@ -7,6 +7,7 @@
 // Structure to hold array metadata
 typedef struct {
     void* data;           // Pointer to contiguous data
+    int owns_data;  // 1 if this instance owns the data, 0 otherwise
     size_t* shape;        // Array dimensions
     size_t* strides;      // Number of elements to skip in each dimension
     size_t ndim;          // Number of dimensions
@@ -25,5 +26,7 @@ void mdarray_zeros(MDArray* arr);
 MDArray* mdarray_resize(MDArray* arr, size_t ndim, size_t* shape);
 MDArray* mdarray_copy(MDArray* arr, size_t ndim, size_t* start);
 MDArray* mdarray_sum(MDArray* a, MDArray* b);
+MDArray* mdarray_transpose(MDArray* arr);
+MDArray* mdarray_sum_along_axis(MDArray* arr, size_t axis);
 
 #endif // MDARRAY_H

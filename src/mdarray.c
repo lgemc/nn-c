@@ -1,3 +1,5 @@
+#pragma once
+
 #include "mdarray.h"
 #include <stdio.h>
 #include <stddef.h>
@@ -47,13 +49,16 @@ MDArray* mdarray_create(size_t ndim, size_t* shape, size_t itemsize) {
         return NULL;
     }
 
+    arr->owns_data = 1; // This MDArray owns its data
+
     return arr;
 }
 
 
 void mdarray_free(MDArray* arr) {
     if (arr) {
-        free(arr->data);
+        if (arr->owns_data)
+           free(arr->data);
         free(arr->shape);
         free(arr->strides);
         free(arr);
@@ -164,6 +169,7 @@ MDArray* mdarray_copy(MDArray* arr, size_t ndim, size_t* start) {
 
     // Start pointer at given index
     new_arr->data = &arr->data[flat_index];
+    new_arr->owns_data = 0; // This is a view, so it does not own the data
     if (!new_arr->data) {
         free(new_arr->strides);
         free(new_arr->shape);
@@ -205,23 +211,118 @@ MDArray* mdarray_resize(MDArray* arr, size_t ndim, size_t* shape) {
     }
 
     new_arr->data = arr->data;
+    new_arr->data = arr->data; // or &arr->data[flat_index]
+    new_arr->owns_data = 0; // This is a view, so it does not own the data
 
     return new_arr;
 }
 
 MDArray* mdarray_sum(MDArray* a, MDArray* b) {
-    // TODO: Figure out how to do sum with different shapes check numpy doc.
-    MDArray* out = mdarray_create(2, a->shape, sizeof(double));
-    for(size_t i = 0; i < a->total_size; i++) {
-        double x = *(double*)&a->data[i];
-        double y = x + *(double*)&b->data[i];
-        memcpy((char*)out->data + (i * a->itemsize), &y, a->itemsize);
+    if (a->ndim != b->ndim) {
+        printf("Arrays must have the same number of dimensions\n");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < a->ndim; i++) {
+        if (a->shape[i] != b->shape[i]) {
+            printf("Arrays must have the same shape\n");
+            return NULL;
+        }
+    }
+
+    MDArray* out = mdarray_create(a->ndim, a->shape, sizeof(double));
+    if (!out) return NULL;
+
+    for (size_t i = 0; i < a->total_size; i++) {
+        double x = *(double*)((char*)a->data + i * a->itemsize);
+        double y = *(double*)((char*)b->data + i * b->itemsize);
+        double sum = x + y;
+        memcpy((char*)out->data + i * a->itemsize, &sum, a->itemsize);
     }
 
     return out;
 }
 
+MDArray* mdarray_sum_along_axis(MDArray* arr, size_t axis) {
+    if (axis >= arr->ndim) {
+        printf("Axis out of bounds\n");
+        return NULL;
+    }
 
+    // Create a new shape for the output array
+    size_t* new_shape = (size_t*)malloc((arr->ndim - 1) * sizeof(size_t));
+    if (!new_shape) return NULL;
+
+    for (size_t i = 0, j = 0; i < arr->ndim; i++) {
+        if (i != axis) {
+            new_shape[j++] = arr->shape[i];
+        }
+    }
+
+    MDArray* result = mdarray_create(arr->ndim - 1, new_shape, arr->itemsize);
+    free(new_shape);
+    if (!result) return NULL;
+
+    // Initialize the result array with zeros
+    mdarray_zeros(result);
+
+    // Sum elements along the specified axis
+    size_t* indices = (size_t*)malloc(arr->ndim * sizeof(size_t));
+    size_t* result_indices = (size_t*)malloc((arr->ndim - 1) * sizeof(size_t));
+    if (!indices || !result_indices) {
+        free(indices);
+        free(result_indices);
+        mdarray_free(result);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < arr->total_size; i++) {
+        size_t temp = i;
+        for (size_t j = arr->ndim; j > 0; j--) {
+            indices[j - 1] = temp % arr->shape[j - 1];
+            temp /= arr->shape[j - 1];
+        }
+
+        for (size_t j = 0, k = 0; j < arr->ndim; j++) {
+            if (j != axis) {
+                result_indices[k++] = indices[j];
+            }
+        }
+
+        double* result_value = (double*)mdarray_get_element(result, result_indices);
+        double* arr_value = (double*)mdarray_get_element(arr, indices);
+        *result_value += *arr_value;
+    }
+
+    free(indices);
+    free(result_indices);
+
+    return result;
+}
+
+MDArray* mdarray_transpose(MDArray* arr) {
+    if (arr->ndim != 2) {
+        printf("Transpose is only implemented for 2D arrays\n");
+        return NULL;
+    }
+
+    // Create a new array with swapped dimensions
+    size_t new_shape[2] = {arr->shape[1], arr->shape[0]};
+    MDArray* transposed = mdarray_create(2, new_shape, arr->itemsize);
+    if (!transposed) return NULL;
+
+    // Copy elements to the new array with transposed indices
+    for (size_t i = 0; i < arr->shape[0]; i++) {
+        for (size_t j = 0; j < arr->shape[1]; j++) {
+            size_t old_indices[2] = {i, j};
+            size_t new_indices[2] = {j, i};
+            void* value = mdarray_get_element(arr, old_indices);
+            mdarray_set_element(transposed, new_indices, value);
+        }
+    }
+
+    return transposed;
+}
 
 void mdarray_ones(MDArray* arr) {
     for(size_t i = 0; i < arr->total_size; i++) {
